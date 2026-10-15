@@ -68,7 +68,7 @@
   .badge.warn{color:#ffd479;border-color:#5c4a2a}
   .badge.todo{color:#ff9a9d;border-color:#5c2a2c}
   .status{font-size:13px;padding:10px 12px;border-radius:8px;margin-top:12px;
-          display:none}
+          display:none;white-space:pre-line;line-height:1.7}
   .status.show{display:block}
   .status.info{background:rgba(79,140,255,.12);color:#9dc0ff}
   .status.ok{background:rgba(53,196,106,.12);color:#7ee0a0}
@@ -110,7 +110,8 @@
         <div id="dropText">拖视频到这里,或点击这里选择文件</div>
       </label>
       <div class="meta" id="fileMeta"></div>
-      <div class="meta" id="fileError" style="color:#ff9a9d"></div>
+      <div class="meta" id="fileError"
+           style="color:#ff9a9d;white-space:pre-line;line-height:1.7"></div>
     </div>
 
     <div class="card" style="margin-top:16px">
@@ -118,7 +119,7 @@
       <div class="row">
         <div>
           <label>艺人名</label>
-          <input type="text" id="artist" placeholder="Artist">
+          <input type="text" id="artist" placeholder="Gunna">
         </div>
         <div>
           <label>年代</label>
@@ -285,7 +286,17 @@ async function upload(file){
     checkReady();
   }catch(err){
     $('#dropText').textContent = '拖视频到这里,或点击这里选择文件';
-    showFileError('上传失败:' + (err && err.message ? err.message : err));
+    // fetch 失败最常见的原因是后端服务停了。直接给排查步骤,
+    // 比只显示 "Failed to fetch" 有用得多。
+    const msg = (err && err.message) ? err.message : String(err);
+    if (/fetch|network|load failed/i.test(msg)){
+      showFileError('连不上后端服务。请检查:\n'
+        + '① 启动工具的终端窗口还开着吗?(关掉窗口 = 服务停止)\n'
+        + '② 没开就重新双击「启动网页工具.bat」\n'
+        + '③ 启动后刷新本页');
+    } else {
+      showFileError('上传失败:' + msg);
+    }
   }
 }
 
@@ -600,6 +611,19 @@ function show(sel, cls, msg){
   const el = $(sel); el.className = 'status show ' + cls; el.textContent = msg;
 }
 refreshTitle();
+
+/* 页面打开时先探一下后端是否活着。
+   若服务已停,立刻提示,省得你拖了半天才发现连不上。
+   (fetch 失败最典型的表现就是 "Failed to fetch",信息量太低。) */
+(async () => {
+  try{
+    const r = await fetch('/api/ping', {method:'GET', cache:'no-store'});
+    if (!r.ok) throw new Error('bad status');
+  }catch(e){
+    show('#status','err','⚠️ 后端服务没在运行 —— 上传、翻译、出片都会失败。\n'
+      + '请双击「启动网页工具.bat」重新启动(那个窗口要一直开着),然后刷新本页。');
+  }
+})();
 </script>
 </body>
 </html>

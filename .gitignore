@@ -4,6 +4,9 @@
 profiles/style_rules.txt
 profiles/glossary.txt
 
+# 发布脚本(处理 token,留在本地)
+publish_github.py
+
 # ---- 个人语料(你的翻译资产) ----
 profiles/_语料/
 !profiles/_语料/.gitkeep

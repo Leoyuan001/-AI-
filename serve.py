@@ -387,6 +387,11 @@ class Handler(BaseHTTPRequestHandler):
                 return self.send_json({"error": "缺少 web/index.html"}, 500)
             with open(f, "rb") as fh:
                 return self.send_bytes(fh.read(), "text/html; charset=utf-8")
+        if p == "/api/ping":
+            # 给前端探活用:页面打开时先确认后端是否在跑。
+            # 存在的意义:服务停掉后前端只会显示 "Failed to fetch",
+            # 信息量太低,用户不知道该干什么。
+            return self.send_json({"ok": True, "service": "lyrics-studio"})
         if p == "/api/job":
             jid = urllib.parse.parse_qs(u.query).get("id", [""])[0]
             with JOBS_LOCK:
