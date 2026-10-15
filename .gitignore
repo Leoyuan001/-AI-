@@ -1,0 +1,31 @@
+# ---- 密钥与个人配置:绝对不要提交 ----
+.deepseek_key
+.env
+profiles/style_rules.txt
+profiles/glossary.txt
+
+# ---- 个人语料(你的翻译资产) ----
+profiles/_语料/
+!profiles/_语料/.gitkeep
+
+# ---- 生成物与素材(体积大 + 可能含版权内容) ----
+samples/
+projects/
+distill/
+_tmp/
+*.mp4
+*.mov
+*.mkv
+*.wav
+
+# ---- Python ----
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+
+# ---- 编辑器 / 系统 ----
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db

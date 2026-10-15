@@ -1,0 +1,605 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>歌词翻译成片工具</title>
+<style>
+  :root{
+    --bg:#0f1115; --panel:#171a21; --panel2:#1e222b; --line:#2b3140;
+    --fg:#e8eaf0; --dim:#8b93a7; --accent:#4f8cff; --ok:#35c46a; --warn:#e3a008;
+    --err:#e5484d;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--fg);
+       font:14px/1.6 "Microsoft YaHei","Segoe UI",system-ui,sans-serif}
+  header{padding:18px 24px;border-bottom:1px solid var(--line);
+         display:flex;align-items:baseline;gap:14px;flex-wrap:wrap}
+  header h1{font-size:17px;margin:0;font-weight:600}
+  header .sub{color:var(--dim);font-size:13px}
+  main{max-width:1180px;margin:0 auto;padding:24px;
+       display:grid;grid-template-columns:380px 1fr;gap:20px}
+  @media(max-width:980px){main{grid-template-columns:1fr}}
+  .card{background:var(--panel);border:1px solid var(--line);
+        border-radius:12px;padding:16px}
+  .card h2{font-size:13px;margin:0 0 12px;color:var(--dim);
+           font-weight:600;letter-spacing:.4px}
+  .drop{border:2px dashed var(--line);border-radius:10px;padding:26px 14px;
+        text-align:center;color:var(--dim);cursor:pointer;transition:.15s;
+        display:block}                    /* label 需要 block 才吃满宽度 */
+  .drop:hover,.drop.over{border-color:var(--accent);color:var(--fg);
+                         background:rgba(79,140,255,.06)}
+  .drop.has{border-style:solid;border-color:var(--ok);color:var(--fg);
+            text-align:left;padding:12px}
+  .drop *{pointer-events:none}            /* 子元素不抢事件,点击必定落到 label */
+  .meta{font-size:12px;color:var(--dim);margin-top:6px;word-break:break-all}
+  label{display:block;font-size:12px;color:var(--dim);margin:12px 0 5px}
+  input[type=text],input[type=number],textarea{
+    width:100%;background:var(--panel2);border:1px solid var(--line);
+    color:var(--fg);border-radius:8px;padding:9px 11px;font:inherit}
+  textarea{font-family:Consolas,"Courier New",monospace;font-size:13px;
+           resize:vertical}
+  input:focus,textarea:focus{outline:none;border-color:var(--accent)}
+  .row{display:flex;gap:10px}
+  .row>div{flex:1}
+  button{background:var(--accent);color:#fff;border:0;border-radius:8px;
+         padding:11px 18px;font:inherit;font-weight:600;cursor:pointer}
+  button:hover{filter:brightness(1.1)}
+  button:disabled{opacity:.45;cursor:not-allowed}
+  button.ghost{background:transparent;border:1px solid var(--line);color:var(--fg);
+               font-weight:400}
+  .title-preview{background:var(--panel2);border:1px solid var(--line);
+    border-radius:8px;padding:10px 14px;margin-top:6px;text-align:center;
+    background:#fff;color:#111;font-weight:700;font-size:16px}
+  table{width:100%;border-collapse:collapse;font-size:13px}
+  th,td{border-bottom:1px solid var(--line);padding:6px 8px;text-align:left;
+        vertical-align:top}
+  th{color:var(--dim);font-weight:600;font-size:12px}
+  td.en{color:var(--dim);font-size:12.5px}
+  textarea.cell{width:100%;min-height:34px;padding:5px 7px;font-size:13px;
+    background:transparent;border:1px solid transparent;border-radius:6px;
+    font-family:inherit;resize:vertical}
+  textarea.cell:focus{background:var(--panel2);border-color:var(--accent)}
+  .hint{font-size:11.5px;color:var(--warn);margin-top:3px;line-height:1.5}
+  .badge{display:inline-block;font-size:10.5px;padding:1px 6px;border-radius:5px;
+         margin-right:6px;vertical-align:middle;
+         background:var(--panel2);color:var(--dim);border:1px solid var(--line)}
+  .badge.ok{color:#7ee0a0;border-color:#2a5c3d}
+  .badge.warn{color:#ffd479;border-color:#5c4a2a}
+  .badge.todo{color:#ff9a9d;border-color:#5c2a2c}
+  .status{font-size:13px;padding:10px 12px;border-radius:8px;margin-top:12px;
+          display:none}
+  .status.show{display:block}
+  .status.info{background:rgba(79,140,255,.12);color:#9dc0ff}
+  .status.ok{background:rgba(53,196,106,.12);color:#7ee0a0}
+  .status.err{background:rgba(229,72,77,.12);color:#ff9a9d}
+  .bar{height:6px;background:var(--panel2);border-radius:3px;overflow:hidden;
+       margin-top:8px}
+  .bar>i{display:block;height:100%;width:0;background:var(--accent);
+         transition:width .4s}
+  video{width:100%;border-radius:8px;margin-top:10px;background:#000}
+  .dl{display:flex;gap:10px;flex-wrap:wrap;margin-top:10px}
+  .dl a{color:var(--accent);text-decoration:none;border:1px solid var(--line);
+        padding:7px 13px;border-radius:8px;font-size:13px}
+  .dl a:hover{border-color:var(--accent)}
+  .kv{font-size:12px;color:var(--dim);margin-top:8px;line-height:1.7}
+  .kv b{color:var(--fg);font-weight:600}
+  .scroll{max-height:52vh;overflow:auto}
+  details{margin-top:10px;font-size:12.5px;color:var(--dim)}
+  summary{cursor:pointer;color:var(--accent)}
+</style>
+</head>
+<body>
+<header>
+  <h1>歌词翻译成片工具</h1>
+  <span class="sub">拖底片 → 填歌名 → 贴歌词 → 一键出片</span>
+</header>
+
+<main>
+  <!-- 左栏:输入 -->
+  <section>
+    <div class="card">
+      <h2>① 底片(无字幕的干净视频)</h2>
+      <!-- 用真实的 input + label:
+           之前用 JS 动态建 input 再 .click(),但没插进 DOM,
+           部分浏览器/安全设置下弹不出文件选择框(用户反馈"点不开、拖不动")。
+           真实 input 放在页面里最可靠;拖放作为额外入口。 -->
+      <input type="file" id="fileInput" accept="video/*,.mp4,.mov,.mkv"
+             style="display:none">
+      <label for="fileInput" class="drop" id="drop">
+        <div id="dropText">拖视频到这里,或点击这里选择文件</div>
+      </label>
+      <div class="meta" id="fileMeta"></div>
+      <div class="meta" id="fileError" style="color:#ff9a9d"></div>
+    </div>
+
+    <div class="card" style="margin-top:16px">
+      <h2>② 标题</h2>
+      <div class="row">
+        <div>
+          <label>艺人名</label>
+          <input type="text" id="artist" placeholder="Artist">
+        </div>
+        <div>
+          <label>年代</label>
+          <input type="number" id="era" placeholder="1950">
+        </div>
+      </div>
+      <label>标题预览(按你的固定公式)</label>
+      <div class="title-preview" id="titlePreview">如果____出生于____s</div>
+      <details>
+        <summary>想手写标题?</summary>
+        <input type="text" id="titleManual" placeholder="留空则用上面的公式"
+               style="margin-top:6px">
+      </details>
+    </div>
+  </section>
+
+  <!-- 右栏:歌词与出片 -->
+  <section>
+    <div class="card">
+      <h2>③ 歌词</h2>
+      <div class="row">
+        <div>
+          <label>歌词输入(会自动解析)</label>
+          <textarea id="rawLyrics" rows="9" placeholder="把歌词粘在这里。支持:
+· 只有英文(我再逐句填中文)
+· 英文一行、中文一行(交错)
+· 英文<Tab>中文
+· 双语 SRT"></textarea>
+        </div>
+      </div>
+      <div style="margin-top:10px;display:flex;gap:10px;flex-wrap:wrap;align-items:center">
+        <button class="ghost" id="btnParse">解析歌词</button>
+        <button id="btnTranslate">AI 翻译</button>
+        <button class="ghost" id="btnCheck">规则体检</button>
+        <button class="ghost" id="btnClear">清空</button>
+        <select id="modelSel" style="background:var(--panel2);color:var(--fg);
+                border:1px solid var(--line);border-radius:8px;padding:8px 10px">
+          <option value="deepseek-v4-pro">deepseek-v4-pro(更准)</option>
+          <option value="deepseek-flash">deepseek-flash(更快)</option>
+        </select>
+        <span class="meta" id="parseInfo" style="margin:0;align-self:center"></span>
+      </div>
+      <div id="checkBox" style="margin-top:10px"></div>
+      <details style="margin-top:10px">
+        <summary>把它学到的也存下来(越用越准)</summary>
+        <div class="meta" style="margin-top:6px">
+          你已核对好的「英文 / 中文」对照贴进来 → 存成语料。
+          下次遇到同样的句子会直接复用你这次的译文。
+        </div>
+        <textarea id="corpusIn" rows="4" placeholder="英文一行
+中文一行
+(或 英文&lt;Tab&gt;中文)"></textarea>
+        <div style="margin-top:8px">
+          <button class="ghost" id="btnCorpus">存成语料</button>
+          <span class="meta" id="corpusMsg" style="margin-left:8px"></span>
+        </div>
+      </details>
+    </div>
+
+    <div class="card" style="margin-top:16px">
+      <h2>④ 逐句核对(可直接改中文)</h2>
+      <div class="scroll">
+        <table id="tbl">
+          <thead><tr><th style="width:30px">#</th>
+            <th style="width:44%">英文</th>
+            <th>中文译文</th>
+            <th style="width:64px">时间</th></tr></thead>
+          <tbody id="tbody">
+            <tr><td colspan="4" class="meta">解析歌词后显示</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="meta" id="glossInfo"></div>
+    </div>
+
+    <div class="card" style="margin-top:16px">
+      <h2>⑤ 出片</h2>
+      <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center">
+        <button id="btnGen" disabled>一键出片</button>
+        <span id="genHint" class="meta" style="margin:0">
+          先选底片、填标题、解析歌词</span>
+      </div>
+      <div class="bar" id="bar" style="display:none"><i id="barIn"></i></div>
+      <div class="status" id="status"></div>
+      <div id="result"></div>
+    </div>
+  </section>
+</main>
+
+<script>
+const $ = s => document.querySelector(s);
+let state = { file:null, words:[], jobId:null, timer:null };
+
+/* ---------- 上传:真实 input + 拖放双通道 ---------- */
+const drop = $('#drop');
+const fileInput = $('#fileInput');
+
+// 通道一:点击 label 触发真实 input(浏览器原生行为,最可靠)
+fileInput.addEventListener('change', () => {
+  if (fileInput.files && fileInput.files[0]) upload(fileInput.files[0]);
+});
+
+// 通道二:拖放。
+// 注意:dragover/drop 必须 preventDefault,否则浏览器会直接用文件"打开"页面。
+// 而且要同时监听 document,防止拖到子元素或页面空白处时事件丢失。
+function preventDefault(e){ e.preventDefault(); e.stopPropagation(); }
+['dragenter','dragover'].forEach(t => {
+  drop.addEventListener(t, e => { preventDefault(e); drop.classList.add('over'); });
+  document.addEventListener(t, e => preventDefault(e));
+});
+drop.addEventListener('dragleave', e => {
+  preventDefault(e); drop.classList.remove('over');
+});
+['drop'].forEach(t => {
+  drop.addEventListener(t, e => {
+    preventDefault(e);
+    drop.classList.remove('over');
+    const dt = e.dataTransfer;
+    const f = dt && dt.files && dt.files[0];
+    if (f) upload(f);
+    else showFileError('没有读到文件,请改用「点击这里选择文件」');
+  });
+  document.addEventListener(t, e => {
+    preventDefault(e);
+    if (!drop.contains(e.target)) {
+      const dt = e.dataTransfer;
+      const f = dt && dt.files && dt.files[0];
+      if (f) upload(f);
+    }
+  });
+});
+
+function showFileError(msg){
+  $('#fileError').textContent = msg || '';
+}
+
+async function upload(file){
+  // 友好校验:先把明显不对的挡在本地,不用等上传完才报错
+  if (!file){
+    showFileError('没有拿到文件'); return;
+  }
+  if (file.size === 0){
+    showFileError('这个文件是 0 字节,可能没下完'); return;
+  }
+  if (file.size > 800 * 1024 * 1024){
+    showFileError('文件超过 800MB,请先压缩'); return;
+  }
+  showFileError('');
+  $('#dropText').textContent = '上传中…(共 ' + fmtSize(file.size) + ')';
+  const fd = new FormData();
+  fd.append('video', file);
+  try{
+    const r = await fetch('/api/upload', {method:'POST', body:fd});
+    const txt = await r.text();
+    let j;
+    try { j = JSON.parse(txt); }
+    catch(e){ throw new Error('服务器返回异常:' + txt.slice(0, 120)); }
+    if (j.error) throw new Error(j.error);
+    state.file = j;
+    drop.classList.add('has');
+    $('#dropText').innerHTML = '<b>' + esc(j.name) + '</b>';
+    $('#fileMeta').textContent =
+      j.width + '×' + j.height + ' · ' + j.duration.toFixed(1) + 's · 已就绪';
+    checkReady();
+  }catch(err){
+    $('#dropText').textContent = '拖视频到这里,或点击这里选择文件';
+    showFileError('上传失败:' + (err && err.message ? err.message : err));
+  }
+}
+
+function fmtSize(n){
+  if (n < 1024) return n + ' B';
+  if (n < 1024*1024) return (n/1024).toFixed(1) + ' KB';
+  return (n/1024/1024).toFixed(1) + ' MB';
+}
+
+/* ---------- 标题 ---------- */
+function refreshTitle(){
+  const manual = $('#titleManual').value.trim();
+  if (manual){ $('#titlePreview').textContent = manual; return manual; }
+  const a = $('#artist').value.trim(), e = $('#era').value.trim();
+  const t = (a && e) ? ('如果' + a + '出生于' + e + 's')
+                     : '如果____出生于____s';
+  $('#titlePreview').textContent = t;
+  return (a && e) ? t : '';
+}
+$('#artist').oninput = $('#era').oninput = $('#titleManual').oninput = () => {
+  refreshTitle(); checkReady();
+};
+
+/* ---------- 歌词解析 ---------- */
+$('#btnParse').onclick = async () => {
+  const text = $('#rawLyrics').value;
+  if (!text.trim()) { show('#status','info','先粘贴歌词'); return; }
+  const fd = new FormData();
+  fd.append('lyrics', text);
+  const r = await fetch('/api/parse', {method:'POST', body:fd});
+  const j = await r.json();
+  state.words = j.lines || [];
+  renderTable();
+  const n = state.words.length;
+  const auto = state.words.filter(w => w.zh).length;
+  const corpus = state.words.filter(w => (w.来源||'').includes('语料')).length;
+  $('#parseInfo').textContent =
+    '共 ' + n + ' 句 · 自动填出 ' + auto + ' 句'
+    + (corpus ? '(其中 ' + corpus + ' 句来自你的语料库)' : '')
+    + (n - auto ? ' · 还需译 ' + (n - auto) + ' 句' : '');
+  checkReady();
+};
+$('#btnClear').onclick = () => {
+  $('#rawLyrics').value = ''; state.words = []; renderTable();
+  $('#parseInfo').textContent = ''; checkReady();
+};
+
+/* ---------- 规则体检 ---------- */
+$('#btnCheck').onclick = async () => {
+  if (!state.words.length){
+    show('#status','info','先点「解析歌词」'); return;
+  }
+  const btn = $('#btnCheck');
+  btn.disabled = true;
+  $('#checkBox').innerHTML = '<div class="meta">体检中…</div>';
+  try{
+    const fd = new FormData();
+    fd.append('lines', JSON.stringify(state.words.map(w =>
+      ({en:w.en, zh:w.zh}))));
+    const r = await fetch('/api/check', {method:'POST', body:fd});
+    const j = await r.json();
+    if (j.error){
+      $('#checkBox').innerHTML = '<div class="badge todo">体检失败</div> '
+        + esc(j.error);
+      btn.disabled = false; return;
+    }
+    renderCheck(j);
+  }catch(err){
+    $('#checkBox').innerHTML = '<div class="badge todo">体检失败</div> '
+      + esc(String(err));
+  }
+  btn.disabled = false;
+};
+
+function renderCheck(j){
+  const box = $('#checkBox');
+  const persons = {};
+  (j.第一人称||[]).forEach(p => persons[p] = (persons[p]||0)+1);
+  const pstr = Object.entries(persons).map(([k,v]) => k+'×'+v).join(' ');
+  let html = '';
+  if (!j.总问题){
+    html += '<div class="status ok show" style="margin:0">✅ 未发现规则违规</div>';
+  } else {
+    const sev = j.严重 || 0;
+    html += '<div class="status ' + (sev ? 'err' : 'info')
+         + ' show" style="margin:0">'
+         + (sev ? ('❌ 严重 ' + sev + ' 项') : '⚠️ 无严重问题')
+         + ' · 共 ' + j.总问题 + ' 项'
+         + (pstr ? ' · 第一人称 ' + esc(pstr) : '')
+         + '</div>';
+    html += '<div class="hint" style="max-height:190px;overflow:auto;'
+         + 'margin-top:6px;white-space:pre-line">'
+         + esc((j.issues||[]).map(x =>
+             (x.级别 === '严重' ? '❌ ' : '⚠️ ')
+             + (x.句 ? ('第' + x.句 + '句  ') : '全篇  ') + x.说明
+           ).join('\n'))
+         + '</div>';
+    if (sev){
+      html += '<div style="margin-top:8px"><button class="ghost" '
+           + 'id="btnFix">一键修正可自动处理的问题</button></div>';
+    }
+  }
+  box.innerHTML = html;
+  const bf = $('#btnFix');
+  if (bf) bf.onclick = () => {
+    // 严重项里有一部分是机械问题(末尾垫词、标点),可以直接套用修好的版本
+    (j.fixed||[]).forEach((f, i) => {
+      if (state.words[i] && f.zh !== undefined) state.words[i].zh = f.zh;
+    });
+    renderTable();
+    box.innerHTML = '<div class="status ok show" style="margin:0">'
+      + '✅ 已套用自动修正。剩下的语义问题仍需你核对,再点一次「规则体检」确认。</div>';
+    show('#status','ok','已修正机械问题(垫词/标点),请复查');
+  };
+}
+
+/* ---------- AI 翻译(DeepSeek API,按配方) ---------- */
+$('#btnTranslate').onclick = async () => {
+  if (!state.words.length){
+    show('#status','info','先点「解析歌词」'); return;
+  }
+  const need = state.words.filter(w => !w.zh).length;
+  if (!need){
+    show('#status','ok','所有句子都已有译文,不需要再译'); return;
+  }
+  const model = $('#modelSel').value;
+  const btn = $('#btnTranslate');
+  btn.disabled = true;
+  // 先把明显的问题挡在本地:没译完 / 没选底片,不必白等 API
+  const empty = state.words.filter(w => !w.en).length;
+  if (empty){
+    show('#status','err','有 ' + empty + ' 句没有英文原文,先检查歌词');
+    $('#parseInfo').textContent = '';
+    btn.disabled = false;
+    return;
+  }
+  show('#status','info','AI 翻译中…' + need + ' 句待译(推理模型,约 10–60 秒),请勿关页面');
+  $('#parseInfo').textContent = 'AI 翻译中…';
+  try{
+    const fd = new FormData();
+    fd.append('lines', JSON.stringify(state.words.map(w =>
+      ({en:w.en, zh:w.zh}))));
+    fd.append('model', model);
+    const r = await fetch('/api/translate', {method:'POST', body:fd});
+    const j = await r.json();
+    if (j.error){
+      show('#status','err', j.error);
+      $('#parseInfo').textContent = '';
+      btn.disabled = false;
+      return;
+    }
+    j.lines.forEach((l, i) => {
+      if (!state.words[i]) return;
+      if (!state.words[i].zh && l.zh){
+        state.words[i].zh = l.zh;
+        state.words[i].来源 = (l.来源 === '语料命中') ? '语料库' : 'AI 翻译';
+      }
+    });
+    renderTable();
+    const st = j.stat || {};
+    const fail = st.失败 || 0;
+    $('#parseInfo').textContent =
+      'AI 完成 · 模型 ' + (j.model || model) + ' · 翻译 '
+      + (st.模型翻译||0) + ' 句 · 语料命中 ' + (st.语料命中||0)
+      + (fail ? ' · 失败 ' + fail : '');
+    if (fail) show('#status','err','有 ' + fail + ' 句翻译失败,请重试或手动填');
+    else show('#status','ok','AI 翻译完成。请逐句核对,特别是重复句要换说法');
+    // 译完自动体检一次:把规则违规立刻暴露出来,不用你手动点
+    setTimeout(() => $('#btnCheck').click(), 200);
+  }catch(err){
+    show('#status','err','请求失败:' + (err && err.message ? err.message : err));
+    $('#parseInfo').textContent = '';
+  }
+  btn.disabled = false;
+  checkReady();
+};
+$('#btnCorpus').onclick = async () => {
+  const v = $('#corpusIn').value;
+  if (!v.trim()){ $('#corpusMsg').textContent = '先贴对照'; return; }
+  const fd = new FormData(); fd.append('lines', v);
+  const r = await fetch('/api/corpus', {method:'POST', body:fd});
+  const j = await r.json();
+  if (j.error){ $('#corpusMsg').textContent = '失败:' + j.error; return; }
+  $('#corpusMsg').textContent =
+    '已存 ' + j.added + ' 条(跳过 ' + j.skipped + ') · 语料库共 ' + j.total + ' 条';
+  if (j.added) $('#corpusIn').value = '';
+};
+
+function renderTable(){
+  const tb = $('#tbody');
+  if (!state.words.length){
+    tb.innerHTML = '<tr><td colspan="4" class="meta">解析歌词后显示</td></tr>';
+    return;
+  }
+  tb.innerHTML = state.words.map((w,i) => {
+    // 来源标记:让用户一眼看出哪句是自动填的、哪句要自己译
+    const src = w.来源 || '';
+    let badge = '';
+    if (src.includes('语料')) badge = '<span class="badge ok">语料库</span>';
+    else if (src.includes('骨架')) badge = '<span class="badge warn">骨架·需润色</span>';
+    else if (src.includes('空') || src.includes('需要')) badge = '<span class="badge todo">待译</span>';
+    else if (src) badge = '<span class="badge">已填</span>';
+
+    const bits = [];
+    if (w.术语 && w.术语.length) bits.push('术语:' + w.术语.join(' / '));
+    if (w.规则 && w.规则.length) bits.push('规则:' + w.规则.join(' ; '));
+    if (w.提示 && w.提示.length) bits.push('⚠️ ' + w.提示.join(' ; '));
+    const hint = bits.length
+      ? '<div class="hint">' + esc(bits.join('  |  ')) + '</div>' : '';
+
+    return '<tr><td>' + (i+1) + '</td>'
+      + '<td class="en">' + esc(w.en) + '</td>'
+      + '<td>' + badge
+      + '<textarea class="cell" data-i="' + i +
+        '" data-k="zh">' + esc(w.zh||'') + '</textarea>' + hint + '</td>'
+      + '<td class="meta" data-t="' + i + '">—</td></tr>';
+  }).join('');
+  tb.querySelectorAll('textarea.cell').forEach(t => {
+    t.oninput = () => {
+      state.words[+t.dataset.i][t.dataset.k] = t.value;
+      checkReady();
+    };
+  });
+  // 汇总:还需人工的句子数 + 命中的术语
+  const todo = state.words.filter(w => !w.zh).length;
+  const all = state.words.flatMap(w => w.术语 || []);
+  const uniq = [...new Set(all)];
+  const parts = [];
+  if (todo) parts.push('还有 ' + todo + ' 句没有译文 —— 需要翻译;术语表只能给词级提示');
+  if (uniq.length) parts.push('本批命中术语:' + uniq.join(' ; '));
+  const rr = [...new Set(state.words.flatMap(w => w.规则 || []))];
+  if (rr.length) parts.push('适用规则:' + rr.join(' ; '));
+  $('#glossInfo').textContent = parts.join('\n');
+  $('#glossInfo').style.whiteSpace = 'pre-line';
+}
+
+/* ---------- 出片 ---------- */
+function checkReady(){
+  const t = refreshTitle();
+  const ok = state.file && t && state.words.length
+             && state.words.some(w => w.zh);
+  $('#btnGen').disabled = !ok;
+  $('#genHint').textContent = ok
+    ? ('将输出 ' + state.words.length + ' 句字幕的视频')
+    : '先选底片、填标题、解析歌词(至少要有中文译文)';
+}
+
+$('#btnGen').onclick = async () => {
+  // 体检有严重问题时先确认,避免把明显违规的片子渲染出去
+  const cb = document.getElementById('checkBox');
+  if (cb && /严重 [1-9]/.test(cb.textContent)){
+    if (!confirm('规则体检还有严重问题未处理。\n仍然出片吗?')) return;
+  }
+  const fd = new FormData();
+  fd.append('title', refreshTitle());
+  fd.append('lines', JSON.stringify(state.words.map(w =>
+    ({en:w.en, zh:w.zh}))));
+  $('#btnGen').disabled = true;
+  $('#bar').style.display = 'block';
+  $('#result').innerHTML = '';
+  show('#status','info','已提交,正在渲染…');
+  const r = await fetch('/api/generate', {method:'POST', body:fd});
+  const j = await r.json();
+  if (j.error){ show('#status','err',j.error); $('#btnGen').disabled=false; return; }
+  state.jobId = j.job;
+  poll();
+};
+
+async function poll(){
+  const r = await fetch('/api/job/' + state.jobId);
+  const j = await r.json();
+  $('#barIn').style.width = (j.percent||0) + '%';
+  if (j.state === 'done'){
+    show('#status','ok','完成:' + (j.message||''));
+    showResult(j);
+    $('#btnGen').disabled = false;
+    return;
+  }
+  if (j.state === 'error'){
+    show('#status','err', j.message || '渲染失败');
+    if (j.log) $('#status').innerHTML +=
+      '<details><summary>查看日志</summary><pre style="white-space:pre-wrap;' +
+      'font-size:11px;max-height:220px;overflow:auto">' +
+      esc(j.log.slice(-2500)) + '</pre></details>';
+    $('#btnGen').disabled = false;
+    return;
+  }
+  show('#status','info', j.message || '渲染中…');
+  state.timer = setTimeout(poll, 900);
+}
+
+function showResult(j){
+  const q = '?t=' + Date.now();
+  $('#result').innerHTML =
+    '<video controls src="/api/file?name=' + encodeURIComponent(j.video) +
+      '&type=mp4&' + q + '"></video>'
+    + '<div class="dl">'
+    + '<a href="/api/file?name=' + encodeURIComponent(j.video) +
+      '&type=mp4&dl=1" download>下载成片 mp4</a>'
+    + '<a href="/api/file?name=' + encodeURIComponent(j.srt) +
+      '&type=srt&dl=1" download>下载字幕 srt</a>'
+    + '</div>'
+    + '<div class="kv">时长 <b>' + j.duration + 's</b> · '
+    + '字幕 <b>' + j.count + '</b> 句 · 输出 <b>' + j.res + '</b><br>'
+    + '工程目录:<b>' + j.dir + '</b></div>';
+}
+
+/* ---------- 工具 ---------- */
+function esc(s){ return (s||'').replace(/[&<>"]/g,
+  c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c])); }
+function show(sel, cls, msg){
+  const el = $(sel); el.className = 'status show ' + cls; el.textContent = msg;
+}
+refreshTitle();
+</script>
+</body>
+</html>
